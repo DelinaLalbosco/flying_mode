@@ -1,0 +1,4 @@
+glfw
+matplotlib
+mujoco
+numpy

@@ -44,3 +44,24 @@ python3 src/S10_sdk_deploy/interface/robot/simulation/mujoco_simulation_ros2.py
 > - c： rl control default position
 > - wasd：forward/leftward/backward/rightward
 > - qe：clockwise/counter clockwise
+
+## Track Tools
+
+The `track/` folder contains waypoint data and utilities for visualizing and editing a track in the MuJoCo scene at `src/S10_sdk_deploy/S10_description/s10_mjcf/mjcf/scene.xml`.
+
+```bash
+cd track
+python3 -m pip install -r requirements.txt
+python3 scripts/mujoco_track_viewer.py --play
+```
+
+Use the viewer to inspect the track in the native MuJoCo window. Mouse controls rotate, pan, and zoom; `space` toggles marker playback; `n`/`p` step between waypoints.
+
+To select waypoints directly on the MuJoCo scene:
+
+```bash
+cd track
+python3 scripts/select_track_points.py --out-json data/new_track.json --out-csv data/new_track.csv
+```
+
+In the selector, Ctrl+left-click visible scene geometry to add a waypoint. Press `s` to save, `u` to undo, and `q` to save and quit.
