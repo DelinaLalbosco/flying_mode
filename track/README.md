@@ -1,6 +1,6 @@
 # Track
 
-This folder contains the track data and tools. The MuJoCo tools load the scene from `../src/S10_sdk_deploy/S10_description/s10_mjcf/mjcf/scene.xml` and draw/select waypoints inside that environment. The scene and track waypoints are scaled to `0.5`; the robot model is not scaled.
+This folder contains the track data and tools. The MuJoCo tools load the scene from `../src/S10_sdk_deploy/S10_description/s10_mjcf/mjcf/scene.xml` and draw/select waypoints inside that environment. The scene and track waypoints are scaled to `0.75` in x/y; z values and the robot model are not scaled.
 
 ## Contents
 
@@ -15,7 +15,7 @@ This folder contains the track data and tools. The MuJoCo tools load the scene f
 - `outputs/track_mujoco_preview.png`: offscreen MuJoCo preview of the generated scene.
 - `outputs/track_visualization.png`: generated preview from the track data.
 
-The ROS sim-to-sim entrypoint uses `src/S10_sdk_deploy/S10_description/s10_mjcf/mjcf/S10_track.xml` by default. That MJCF keeps the S10 robot unscaled and includes the `0.5` scaled scene plus `track_overlay.xml`.
+The ROS sim-to-sim entrypoint uses `src/S10_sdk_deploy/S10_description/s10_mjcf/mjcf/S10_track.xml` by default. That MJCF keeps the S10 robot unscaled and includes the `0.75` x/y scaled scene plus `track_overlay.xml`.
 
 ## Setup
 

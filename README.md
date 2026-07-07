@@ -35,7 +35,7 @@ source install/setup.bash
 python3 src/S10_sdk_deploy/interface/robot/simulation/mujoco_simulation_ros2.py
 ```
 
-The MuJoCo simulator loads the scaled track scene by default through `S10_track.xml`, which includes the unscaled S10 robot, the `0.5` scaled scene, and the visual track overlay. To choose explicitly:
+The MuJoCo simulator loads the scaled track scene by default through `S10_track.xml`, which includes the unscaled S10 robot, the `0.75` x/y scaled scene, and the visual track overlay. To choose explicitly:
 
 ```bash
 python3 src/S10_sdk_deploy/interface/robot/simulation/mujoco_simulation_ros2.py --scene track
@@ -66,7 +66,7 @@ python3 src/S10_sdk_deploy/interface/robot/simulation/mujoco_simulation_ros2.py
 
 ## Track Tools
 
-The `track/` folder contains waypoint data and utilities for visualizing and editing a track in the MuJoCo scene at `src/S10_sdk_deploy/S10_description/s10_mjcf/mjcf/scene.xml`. The scene and track waypoints are scaled to `0.5`; the robot model is unchanged.
+The `track/` folder contains waypoint data and utilities for visualizing and editing a track in the MuJoCo scene at `src/S10_sdk_deploy/S10_description/s10_mjcf/mjcf/scene.xml`. The scene and track waypoints are scaled to `0.75` in x/y; z values and the robot model are unchanged.
 
 ```bash
 cd track

@@ -46,6 +46,7 @@ CAMERA_AZIMUTH = 90
 CAMERA_ELEVATION = -25
 CAMERA_DISTANCE = 3.0
 COLLISION_GEOM_GROUP = 1
+TRACK_START_BASE_POS = np.array([0.0, -2.5, 0.2])
 
 # Calibaration parameters (for sim-to-real consistency)
 JOINT_DIR = np.array([1, 1, -1, 1, 1, -1, 1, -1, -1, 1, -1, 1, -1, -1, 1, -1], dtype=np.float32)
@@ -144,7 +145,7 @@ class MuJoCoSimulationNode(Node):
         """关节位置设置为与 PyBullet 脚本一致的初始角度"""
         qpos0 = self.data.qpos.copy()
         qpos0[7:7 + self.dof_num] = JOINT_INIT[key]  # ,3-6 basequat，0-2 basepos
-        qpos0[:3] = np.array([0, 0, 0.2])
+        qpos0[:3] = TRACK_START_BASE_POS
         qpos0[3:7] = np.array([1, 0, 0, 0])
         self.data.qpos[:] = qpos0
         mujoco.mj_forward(self.model, self.data)

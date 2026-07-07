@@ -26,9 +26,9 @@ private:
     std::thread kb_thread_;
     mutable std::mutex keys_mutex_;
 
-    float max_forward_ = 0.7f;
-    float max_side_    = 0.5f;
-    float max_yaw_     = 0.7f;
+    float max_forward_ = 1.0f;
+    float max_side_    = 0.6f;
+    float max_yaw_     = 1.0f;
 
     std::unordered_set<char> held_keys_;
     std::unordered_map<char, double> last_seen_time_;
