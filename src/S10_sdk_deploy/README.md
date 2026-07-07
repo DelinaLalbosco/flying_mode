@@ -95,6 +95,8 @@ source install/setup.bash
 python3 src/S10_sdk_deploy/interface/robot/simulation/mujoco_simulation_ros2.py
 ```
 
+The simulator loads `S10_track.xml` by default. This wrapper keeps the S10 robot unscaled while using the `0.5` scaled scene and visual track overlay. Use `--scene stair` to run the previous stair wrapper, or set `S10_MUJOCO_XML=/absolute/path/to/model.xml` for a custom MJCF.
+
 ### Control (Terminal 2)
 
 <span style="color: red;">**Note:**</span>
@@ -165,4 +167,3 @@ ros2 run s10_sdk_deploy rl_deploy
 - R2： joint damping
 - Left joystick：forward/leftward/backward/rightward
 - Right joystick：clockwise/counter clockwise
-

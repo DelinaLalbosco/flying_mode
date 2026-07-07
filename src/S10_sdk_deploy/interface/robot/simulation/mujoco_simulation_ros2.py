@@ -13,6 +13,7 @@ import time
 import socket
 import struct
 import threading
+import argparse
 from pathlib import Path
 from scipy.spatial.transform import Rotation
 import numpy as np
@@ -29,12 +30,14 @@ from drdds.msg import ImuData, JointsData, JointsDataCmd, MetaType, ImuDataValue
 MODEL_NAME = "S10"
 # Get the directory of the current Python file
 CURRENT_DIR = Path(__file__).resolve().parent
+MJCF_DIR = (CURRENT_DIR / ".." / ".." / ".." / "S10_description" / "s10_mjcf" / "mjcf").resolve()
 
-# Define the XML path relative to the Python file
-XML_PATH = CURRENT_DIR / ".." / ".." / ".." / "S10_description" / "s10_mjcf" / "mjcf" / "S10_stair.xml"
-
-# Convert to absolute path as string
-XML_PATH = str(XML_PATH.resolve())
+SCENE_XML_PATHS = {
+    "track": MJCF_DIR / "S10_track.xml",
+    "stair": MJCF_DIR / "S10_stair.xml",
+}
+DEFAULT_SCENE_NAME = os.environ.get("S10_MUJOCO_SCENE", "track")
+XML_PATH = str(SCENE_XML_PATHS.get(DEFAULT_SCENE_NAME, SCENE_XML_PATHS["track"]).resolve())
 USE_VIEWER = True
 DT = 0.001
 RENDER_INTERVAL = 10
@@ -55,6 +58,30 @@ JOINT_INIT = {
                      -0.438, 1.16, -2.76, 0,
                      0.438, 1.16, -2.76, 0], dtype=np.float32),
 }
+
+
+def parse_cli_args():
+    parser = argparse.ArgumentParser(description="Run S10 MuJoCo ROS2 simulation.")
+    parser.add_argument(
+        "--scene",
+        choices=sorted(SCENE_XML_PATHS),
+        default=DEFAULT_SCENE_NAME if DEFAULT_SCENE_NAME in SCENE_XML_PATHS else "track",
+        help="Built-in MJCF scene to load. Defaults to S10_MUJOCO_SCENE or 'track'.",
+    )
+    parser.add_argument(
+        "--xml-path",
+        default=os.environ.get("S10_MUJOCO_XML"),
+        help="Custom MJCF path. Overrides --scene and S10_MUJOCO_SCENE.",
+    )
+    parser.add_argument("--model-key", default=MODEL_NAME, help="Robot key used for initial joint pose.")
+    args, ros_args = parser.parse_known_args()
+    return args, ros_args
+
+
+def resolve_xml_path(scene_name: str, xml_path: str | None) -> str:
+    if xml_path:
+        return str(Path(xml_path).expanduser().resolve())
+    return str(SCENE_XML_PATHS[scene_name].resolve())
 
 
 class MuJoCoSimulationNode(Node):
@@ -92,6 +119,7 @@ class MuJoCoSimulationNode(Node):
         self.last_base_linvel = np.zeros((3, 1), np.float64)
         self.timestamp = 0.0
 
+        self.get_logger().info(f"[INFO] MuJoCo MJCF loaded: {xml_path}")
         self.get_logger().info(f"[INFO] MuJoCo model loaded, dof = {self.dof_num}")
 
         # ROS Publishers
@@ -290,8 +318,12 @@ class MuJoCoSimulationNode(Node):
 
 if __name__ == "__main__":
     np.set_printoptions(precision=4, suppress=True)
-    rclpy.init()
-    sim_node = MuJoCoSimulationNode()
+    cli_args, ros_args = parse_cli_args()
+    rclpy.init(args=ros_args)
+    sim_node = MuJoCoSimulationNode(
+        model_key=cli_args.model_key,
+        xml_path=resolve_xml_path(cli_args.scene, cli_args.xml_path),
+    )
     sim_node.start()
     sim_node.destroy_node()
     rclpy.shutdown()

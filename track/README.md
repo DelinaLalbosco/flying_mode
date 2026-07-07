@@ -1,6 +1,6 @@
 # Track
 
-This folder contains the track data and tools. The MuJoCo tools load the original scene from `../src/S10_sdk_deploy/S10_description/s10_mjcf/mjcf/scene.xml` and draw/select waypoints inside that environment.
+This folder contains the track data and tools. The MuJoCo tools load the scene from `../src/S10_sdk_deploy/S10_description/s10_mjcf/mjcf/scene.xml` and draw/select waypoints inside that environment. The scene and track waypoints are scaled to `0.5`; the robot model is not scaled.
 
 ## Contents
 
@@ -14,6 +14,8 @@ This folder contains the track data and tools. The MuJoCo tools load the origina
 - `scripts/select_track_points.py`: MuJoCo point selector for clicking dots on the real scene geometry.
 - `outputs/track_mujoco_preview.png`: offscreen MuJoCo preview of the generated scene.
 - `outputs/track_visualization.png`: generated preview from the track data.
+
+The ROS sim-to-sim entrypoint uses `src/S10_sdk_deploy/S10_description/s10_mjcf/mjcf/S10_track.xml` by default. That MJCF keeps the S10 robot unscaled and includes the `0.5` scaled scene plus `track_overlay.xml`.
 
 ## Setup
 
@@ -87,10 +89,10 @@ Controls:
 - `h`: hide/show help text.
 - `q` or Esc: save and quit.
 
-By default, clicked points are raised by `0.05 m` so the marker remains visible above the surface. Change that with `--z-offset`, for example:
+By default, clicked points are raised by `0.025 m` so the marker remains visible above the surface. Change that with `--z-offset`, for example:
 
 ```bash
-python3 scripts/select_track_points.py --z-offset 0.10
+python3 scripts/select_track_points.py --z-offset 0.05
 ```
 
 To edit the track instead of starting empty:
@@ -101,4 +103,4 @@ python3 scripts/select_track_points.py --load data/track.json
 
 ## Data Notes
 
-Tune `data/track.json` if simulator alignment needs adjustment.
+Tune `data/track.json` if simulator alignment needs adjustment. Keep coordinates in the scaled scene frame.
