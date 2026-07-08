@@ -34,7 +34,6 @@ MJCF_DIR = (CURRENT_DIR / ".." / ".." / ".." / "S10_description" / "s10_mjcf" / 
 
 SCENE_XML_PATHS = {
     "track": MJCF_DIR / "S10_track.xml",
-    "stair": MJCF_DIR / "S10_stair.xml",
 }
 DEFAULT_SCENE_NAME = os.environ.get("S10_MUJOCO_SCENE", "track")
 XML_PATH = str(SCENE_XML_PATHS.get(DEFAULT_SCENE_NAME, SCENE_XML_PATHS["track"]).resolve())
@@ -44,7 +43,7 @@ RENDER_INTERVAL = 10
 TRACK_BODY_NAME = "base_link"
 CAMERA_AZIMUTH = 90
 CAMERA_ELEVATION = -25
-CAMERA_DISTANCE = 3.0
+CAMERA_DISTANCE = 18.0
 COLLISION_GEOM_GROUP = 1
 TRACK_START_BASE_POS = np.array([0.0, -2.5, 0.2])
 TRACK_REACH_RADIUS = float(os.environ.get("S10_TRACK_REACH_RADIUS", "0.2"))
@@ -271,17 +270,14 @@ class MuJoCoSimulationNode(Node):
             )
 
     def _configure_viewer(self):
-        base_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, TRACK_BODY_NAME)
         with self.viewer.lock():
-            if base_body_id < 0:
-                self.get_logger().warn(f"Cannot find body '{TRACK_BODY_NAME}', viewer camera will not track robot base")
-            else:
-                self.viewer.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
-                self.viewer.cam.trackbodyid = base_body_id
-                self.viewer.cam.fixedcamid = -1
-                self.viewer.cam.azimuth = CAMERA_AZIMUTH
-                self.viewer.cam.elevation = CAMERA_ELEVATION
-                self.viewer.cam.distance = CAMERA_DISTANCE
+            self.viewer.cam.type = mujoco.mjtCamera.mjCAMERA_FREE
+            self.viewer.cam.trackbodyid = -1
+            self.viewer.cam.fixedcamid = -1
+            self.viewer.cam.lookat[:] = self.data.qpos[:3]
+            self.viewer.cam.azimuth = CAMERA_AZIMUTH
+            self.viewer.cam.elevation = CAMERA_ELEVATION
+            self.viewer.cam.distance = CAMERA_DISTANCE
 
             if COLLISION_GEOM_GROUP < len(self.viewer.opt.geomgroup):
                 self.viewer.opt.geomgroup[COLLISION_GEOM_GROUP] = 0
