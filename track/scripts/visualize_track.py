@@ -75,7 +75,7 @@ def draw_projection(
     ax.scatter(
         x_values[1:],
         y_values[1:],
-        s=70,
+        s=35,
         color="red",
         edgecolor="black",
         linewidth=0.8,
@@ -85,7 +85,7 @@ def draw_projection(
         x_values[0],
         y_values[0],
         marker="^",
-        s=260,
+        s=130,
         color="blue",
         label="start",
         zorder=4,
@@ -94,7 +94,7 @@ def draw_projection(
         x_values[-1],
         y_values[-1],
         marker="*",
-        s=260,
+        s=130,
         color="red",
         label="end",
         zorder=5,
@@ -123,13 +123,13 @@ def visualize(waypoints: list[dict[str, float | int | str]], labels: bool) -> pl
         y,
         c=z,
         cmap="plasma",
-        s=78,
+        s=39,
         edgecolor="black",
         linewidth=0.8,
         zorder=3,
     )
-    axes[0].scatter(x[0], y[0], marker="^", s=260, color="blue", label="start", zorder=4)
-    axes[0].scatter(x[-1], y[-1], marker="*", s=260, color="red", label="end", zorder=5)
+    axes[0].scatter(x[0], y[0], marker="^", s=130, color="blue", label="start", zorder=4)
+    axes[0].scatter(x[-1], y[-1], marker="*", s=130, color="red", label="end", zorder=5)
     if labels:
         add_labels(axes[0], x[1:], y[1:], ids[1:])
     axes[0].set_title("Top-Down (XY) View")

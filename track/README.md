@@ -17,6 +17,8 @@ This folder contains the track data and tools. The MuJoCo tools load the scene f
 
 The ROS sim-to-sim entrypoint uses `src/S10_sdk_deploy/S10_description/s10_mjcf/mjcf/S10_track.xml` by default. That MJCF keeps the S10 robot unscaled and includes the `0.75` x/y scaled scene plus `track_overlay.xml`.
 
+In the ROS simulator, track waypoints are reached in sequence. The timer starts at waypoint 0, reached waypoints disappear from the viewer, and the final waypoint stops the timer. The default reach radius is `0.2 m` in the horizontal plane; set `S10_TRACK_REACH_RADIUS` or `S10_TRACK_DISTANCE_MODE=xyz` before launching if needed.
+
 ## Setup
 
 From this folder, install dependencies if needed:

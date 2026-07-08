@@ -272,7 +272,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base-scene", type=Path, default=DEFAULT_BASE_SCENE, help="Base MJCF scene.xml to load.")
     parser.add_argument("--xml-out", type=Path, default=DEFAULT_XML, help="Generated MJCF output path.")
     parser.add_argument("--line-radius", type=float, default=0.07, help="Rendered track tube radius.")
-    parser.add_argument("--marker-radius", type=float, default=0.21, help="Rendered waypoint sphere radius.")
+    parser.add_argument("--marker-radius", type=float, default=0.105, help="Rendered waypoint sphere radius.")
     parser.add_argument("--post-radius", type=float, default=0.0225, help="Vertical height guide radius.")
     parser.add_argument("--no-posts", action="store_true", help="Hide vertical height guide posts.")
     parser.add_argument("--speed", type=float, default=3.0, help="Playback speed in meters per second.")

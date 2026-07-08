@@ -41,6 +41,8 @@ The MuJoCo simulator loads the scaled track scene by default through `S10_track.
 python3 src/S10_sdk_deploy/interface/robot/simulation/mujoco_simulation_ros2.py --scene track
 ```
 
+During the track scene, waypoint progress is checked in order. When the robot base enters a `0.2 m` horizontal radius of waypoint 0, the timer starts and that waypoint disappears. Each following waypoint disappears only after the previous one has been reached. When the final waypoint is reached, the timer stops and the elapsed simulation time is printed in the terminal.
+
 To use the previous stair scene wrapper instead:
 
 ```bash

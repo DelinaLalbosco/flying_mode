@@ -47,6 +47,10 @@ CAMERA_ELEVATION = -25
 CAMERA_DISTANCE = 3.0
 COLLISION_GEOM_GROUP = 1
 TRACK_START_BASE_POS = np.array([0.0, -2.5, 0.2])
+TRACK_REACH_RADIUS = float(os.environ.get("S10_TRACK_REACH_RADIUS", "0.2"))
+TRACK_DISTANCE_MODE = os.environ.get("S10_TRACK_DISTANCE_MODE", "xy").lower()
+TRACK_WAYPOINT_PREFIX = "track_waypoint_"
+TRACK_HEIGHT_POST_PREFIX = "track_height_post_"
 
 # Calibaration parameters (for sim-to-real consistency)
 JOINT_DIR = np.array([1, 1, -1, 1, 1, -1, 1, -1, -1, 1, -1, 1, -1, -1, 1, -1], dtype=np.float32)
@@ -107,6 +111,7 @@ class MuJoCoSimulationNode(Node):
 
         # 初始化站立姿态
         self._set_initial_pose(model_key)
+        self._init_track_progress()
 
         # 缓存
         self.kp_cmd = np.zeros((self.dof_num, 1), np.float32)
@@ -149,6 +154,121 @@ class MuJoCoSimulationNode(Node):
         qpos0[3:7] = np.array([1, 0, 0, 0])
         self.data.qpos[:] = qpos0
         mujoco.mj_forward(self.model, self.data)
+
+    def _track_geom_index(self, name: str, prefix: str):
+        if not name or not name.startswith(prefix):
+            return None
+        suffix = name[len(prefix):]
+        index_text = suffix.split("_", 1)[0]
+        if not index_text.isdigit():
+            return None
+        return int(index_text)
+
+    def _find_track_geoms(self):
+        waypoint_geoms = {}
+        point_related_geoms = {}
+        for geom_id in range(self.model.ngeom):
+            name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_GEOM, geom_id)
+            waypoint_index = self._track_geom_index(name, TRACK_WAYPOINT_PREFIX)
+            if waypoint_index is not None:
+                waypoint_geoms[waypoint_index] = geom_id
+                point_related_geoms.setdefault(waypoint_index, []).append(geom_id)
+                continue
+
+            post_index = self._track_geom_index(name, TRACK_HEIGHT_POST_PREFIX)
+            if post_index is not None:
+                point_related_geoms.setdefault(post_index, []).append(geom_id)
+
+        return waypoint_geoms, point_related_geoms
+
+    def _init_track_progress(self):
+        self.track_enabled = False
+        self.track_complete = False
+        self.track_next_index = 0
+        self.track_start_time = None
+        self.track_finish_time = None
+        self.track_waypoint_positions = np.empty((0, 3), dtype=np.float64)
+        self.track_point_geom_ids = {}
+
+        waypoint_geoms, point_related_geoms = self._find_track_geoms()
+        if not waypoint_geoms:
+            return
+
+        expected_indices = list(range(max(waypoint_geoms) + 1))
+        missing = [index for index in expected_indices if index not in waypoint_geoms]
+        if missing:
+            self.get_logger().warn(f"Track progress disabled; missing waypoint geoms: {missing}")
+            return
+
+        self.track_waypoint_geom_ids = [waypoint_geoms[index] for index in expected_indices]
+        self.track_point_geom_ids = {
+            index: point_related_geoms.get(index, [waypoint_geoms[index]])
+            for index in expected_indices
+        }
+        self.track_waypoint_positions = np.array(
+            [self.data.geom_xpos[geom_id].copy() for geom_id in self.track_waypoint_geom_ids],
+            dtype=np.float64,
+        )
+        self.track_original_rgba = {
+            geom_id: self.model.geom_rgba[geom_id].copy()
+            for geom_ids in self.track_point_geom_ids.values()
+            for geom_id in geom_ids
+        }
+        self.track_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, TRACK_BODY_NAME)
+        if self.track_body_id < 0:
+            self.get_logger().warn(f"Track progress disabled; cannot find body '{TRACK_BODY_NAME}'")
+            return
+
+        self.track_enabled = True
+        self.get_logger().info(
+            f"[INFO] Track progress enabled: {len(self.track_waypoint_positions)} waypoints, "
+            f"radius={TRACK_REACH_RADIUS:.3f}m, distance_mode={TRACK_DISTANCE_MODE}"
+        )
+
+    def _hide_track_point(self, waypoint_index: int):
+        for geom_id in self.track_point_geom_ids.get(waypoint_index, []):
+            self.model.geom_rgba[geom_id, 3] = 0.0
+
+    def _track_distance(self, robot_pos: np.ndarray, waypoint_pos: np.ndarray) -> float:
+        if TRACK_DISTANCE_MODE == "xyz":
+            return float(np.linalg.norm(robot_pos - waypoint_pos))
+        return float(np.linalg.norm(robot_pos[:2] - waypoint_pos[:2]))
+
+    def _update_track_progress(self):
+        if not self.track_enabled or self.track_complete:
+            return
+        if self.track_next_index >= len(self.track_waypoint_positions):
+            return
+
+        robot_pos = self.data.xpos[self.track_body_id]
+        waypoint_pos = self.track_waypoint_positions[self.track_next_index]
+        distance = self._track_distance(robot_pos, waypoint_pos)
+        if distance > TRACK_REACH_RADIUS:
+            return
+
+        reached_index = self.track_next_index
+        self._hide_track_point(reached_index)
+
+        if reached_index == 0 and self.track_start_time is None:
+            self.track_start_time = self.timestamp
+            self.get_logger().info(
+                f"[TRACK] Timer started at waypoint 0, sim_time={self.track_start_time:.3f}s"
+            )
+        else:
+            self.get_logger().info(
+                f"[TRACK] Reached waypoint {reached_index}, sim_time={self.timestamp:.3f}s, "
+                f"distance={distance:.3f}m"
+            )
+
+        self.track_next_index += 1
+        if self.track_next_index >= len(self.track_waypoint_positions):
+            self.track_complete = True
+            self.track_finish_time = self.timestamp
+            elapsed = 0.0 if self.track_start_time is None else self.track_finish_time - self.track_start_time
+            self.get_logger().info(
+                f"[TRACK] Final waypoint reached. Timer stopped at sim_time={self.track_finish_time:.3f}s, "
+                f"elapsed={elapsed:.3f}s"
+            )
 
     def _configure_viewer(self):
         base_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, TRACK_BODY_NAME)
@@ -200,6 +320,7 @@ class MuJoCoSimulationNode(Node):
                 mujoco.mj_step(self.model, self.data)
 
                 self.timestamp = step * DT
+                self._update_track_progress()
 
                 # 采样 & 发送观测 (every 5 steps for 200 Hz)
                 if step % 5 == 0:

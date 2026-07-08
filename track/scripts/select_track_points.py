@@ -347,7 +347,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out-csv", type=Path, default=DEFAULT_CSV, help="Output CSV file.")
     parser.add_argument("--name", default="new_scene_track", help="Track name stored in the JSON output.")
     parser.add_argument("--z-offset", type=float, default=0.025, help="Height added to clicked surface points.")
-    parser.add_argument("--marker-radius", type=float, default=0.21)
+    parser.add_argument("--marker-radius", type=float, default=0.105)
     parser.add_argument("--line-radius", type=float, default=0.07)
     parser.add_argument("--post-radius", type=float, default=0.0225)
     parser.add_argument("--no-posts", dest="show_posts", action="store_false", help="Hide vertical height guide posts.")
