@@ -8,7 +8,7 @@ This repository provides the ROS 2 and MuJoCo simulation environment for a conte
 
 The default MuJoCo scene is `S10_track.xml`, which includes:
 
-- the unscaled S10 robot model from `S10.xml`
+- the unscaled S10 robot model from `S10.xml`. The corresponding URDF of S10 is `S10.urdf`.
 - the scaled environment from `scene.xml`
 - the visual waypoint track from `track_overlay.xml`
 
