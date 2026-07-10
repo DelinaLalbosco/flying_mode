@@ -69,6 +69,21 @@ S10_MUJOCO_XML=/absolute/path/to/model.xml \
 python3 src/S10_sdk_deploy/interface/robot/simulation/mujoco_simulation_ros2.py
 ```
 
+## Simulator Parameters
+
+The following parameters are defined near the top of
+`src/S10_sdk_deploy/interface/robot/simulation/mujoco_simulation_ros2.py`.
+Restart the simulator after changing them.
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `USE_VIEWER` | `True` | Enables or disables the MuJoCo viewer. |
+| `CAMERA_AZIMUTH` | `90` | Initial horizontal camera angle in degrees. |
+| `CAMERA_ELEVATION` | `-25` | Initial vertical camera angle in degrees. |
+| `CAMERA_DISTANCE` | `18.0` | Initial camera distance from the robot. |
+| `TRACK_START_BASE_POS` | `[0.0, -2.5, 0.2]` | Initial robot base position in `[x, y, z]` order. |
+| `TRACK_BODY_NAME` | `"base_link"` | MuJoCo body used to track waypoint progress. |
+
 ## Manual Controls
 
 In the simulator window:
