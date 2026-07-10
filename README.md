@@ -78,11 +78,12 @@ Restart the simulator after changing them.
 | Parameter | Default | Description |
 | --- | --- | --- |
 | `USE_VIEWER` | `True` | Enables or disables the MuJoCo viewer. |
+| `TRACK_VIEWER` | `False` | Makes the viewer camera follow `TRACK_BODY_NAME` when the simulator starts. |
 | `CAMERA_AZIMUTH` | `90` | Initial horizontal camera angle in degrees. |
 | `CAMERA_ELEVATION` | `-25` | Initial vertical camera angle in degrees. |
 | `CAMERA_DISTANCE` | `18.0` | Initial camera distance from the robot. |
 | `TRACK_START_BASE_POS` | `[0.0, -2.5, 0.2]` | Initial robot base position in `[x, y, z]` order. |
-| `TRACK_BODY_NAME` | `"base_link"` | MuJoCo body used to track waypoint progress. |
+| `TRACK_BODY_NAME` | `"base_link"` | MuJoCo body used for waypoint progress and startup camera tracking. |
 
 ## Manual Controls
 
@@ -92,5 +93,7 @@ In the simulator window:
 - `c`: RL control default position
 - `w/a/s/d`: forward, leftward, backward, rightward
 - `q/e`: rotate counterclockwise or clockwise
+- `Ctrl` + right-double-click a body: start camera tracking for that body
+- `Esc`: stop camera tracking and return to the free camera
 
 Right-click the simulator window and select "always on top" if it loses focus during testing.

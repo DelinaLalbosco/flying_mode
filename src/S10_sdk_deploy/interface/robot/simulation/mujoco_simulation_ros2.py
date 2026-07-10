@@ -38,6 +38,7 @@ SCENE_XML_PATHS = {
 DEFAULT_SCENE_NAME = os.environ.get("S10_MUJOCO_SCENE", "track")
 XML_PATH = str(SCENE_XML_PATHS.get(DEFAULT_SCENE_NAME, SCENE_XML_PATHS["track"]).resolve())
 USE_VIEWER = True
+TRACK_VIEWER = False
 DT = 0.001
 RENDER_INTERVAL = 10
 TRACK_BODY_NAME = "base_link"
@@ -271,10 +272,25 @@ class MuJoCoSimulationNode(Node):
 
     def _configure_viewer(self):
         with self.viewer.lock():
-            self.viewer.cam.type = mujoco.mjtCamera.mjCAMERA_FREE
-            self.viewer.cam.trackbodyid = -1
+            track_body_id = mujoco.mj_name2id(
+                self.model,
+                mujoco.mjtObj.mjOBJ_BODY,
+                TRACK_BODY_NAME,
+            )
+            if TRACK_VIEWER and track_body_id >= 0:
+                self.viewer.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
+                self.viewer.cam.trackbodyid = track_body_id
+            else:
+                self.viewer.cam.type = mujoco.mjtCamera.mjCAMERA_FREE
+                self.viewer.cam.trackbodyid = -1
+                self.viewer.cam.lookat[:] = self.data.qpos[:3]
+
+                if TRACK_VIEWER:
+                    self.get_logger().warn(
+                        f"Cannot find body '{TRACK_BODY_NAME}'; viewer camera tracking disabled"
+                    )
+
             self.viewer.cam.fixedcamid = -1
-            self.viewer.cam.lookat[:] = self.data.qpos[:3]
             self.viewer.cam.azimuth = CAMERA_AZIMUTH
             self.viewer.cam.elevation = CAMERA_ELEVATION
             self.viewer.cam.distance = CAMERA_DISTANCE
