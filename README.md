@@ -85,6 +85,9 @@ Restart the simulator after changing them.
 | `TRACK_START_BASE_POS` | `[0.0, -2.5, 0.2]` | Initial robot base position in `[x, y, z]` order. |
 | `TRACK_BODY_NAME` | `"base_link"` | MuJoCo body used for waypoint progress and startup camera tracking. |
 
+## Hardware Spec (Lidar)
+Please refer to the files inside this doc: /home/pb/goai_embodied_future_material/doc.
+
 ## Manual Controls
 
 In the simulator window:
