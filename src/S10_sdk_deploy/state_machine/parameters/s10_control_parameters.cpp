@@ -8,8 +8,8 @@ void ControlParameters::GenerateS10Parameters(){
     shank_len_ = 0.25;
     pre_height_ = 0.12;
     stand_height_ = 0.48;
-    swing_leg_kp_ << 200., 200., 200.;
-    swing_leg_kd_ << 4., 4., 4.;
+    swing_leg_kp_ << 120., 120., 120.;
+    swing_leg_kd_ << 2., 2., 2.;
 
     fl_joint_lower_ << -0.4363, -2.443, -2.758;
     fl_joint_upper_ << 0.6109, 2.443, 2.758;
