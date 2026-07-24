@@ -62,11 +62,12 @@ public:
     S10Interface(const std::string &robot_name) : DdsInterface(robot_name, 16) {
         battery_data_.resize(2 * BATTERY_DATA_SIZE);
 
-        float init_pos_offset[16] = {-25, -131, 160, 0.,
-                                     25, -131, 160, 0,
-                                     -25, 131, -160, 0,
-                                     25, 131, -160, 0};
-        float joint_dir[16] = {1, 1, -1, 1,
+        float init_pos_offset[16] = 
+                            {-35, -145, 156, 0.,
+                             35, -145, 156, 0,
+                             -35, 145, -156, 0,
+                             35, 145, -156, 0};
+        float joint_dir[16] = {1, 1, -1, 1, 
                                1, -1, 1, -1,
                                -1, 1, -1, 1.,
                                -1, -1, 1, -1};
