@@ -54,7 +54,10 @@ TRACK_HEIGHT_POST_PREFIX = "track_height_post_"
 
 # Calibaration parameters (for sim-to-real consistency)
 JOINT_DIR = np.array([1, 1, -1, 1, 1, -1, 1, -1, -1, 1, -1, 1, -1, -1, 1, -1], dtype=np.float32)
-POS_OFFSET_DEG = np.array([-25, 229, 160, 0, 25, -131, -200, 0, -25, -229, -160, 0, 25, 131, 200, 0], dtype=np.float32)
+POS_OFFSET_DEG = np.array([-35, -145, 156, 0.,
+                             35, -145, 156, 0,
+                             -35, 145, -156, 0,
+                             35, 145, -156, 0])
 POS_OFFSET_RAD = POS_OFFSET_DEG / 180.0 * np.pi
 
 JOINT_INIT = {
