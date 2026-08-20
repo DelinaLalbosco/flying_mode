@@ -1,102 +1,115 @@
-# S10 Perception Racing Contest
+# S10 Robot Simulation — Flying Mode, Navigation Mode, LiDAR & Camera
 
-[![Discord](https://img.shields.io/badge/-Discord-5865F2?style=flat&logo=Discord&logoColor=white)](https://discord.gg/gdM9mQutC8)
+This repository contains simulation and control code for the S10 robot, including **flying mode**, **navigation mode**, and **LiDAR/camera simulation and information** using MuJoCo.
 
-## Overview
+## Repository Structure
 
-This repository provides the ROS 2 and MuJoCo simulation environment for a contest focused on racing the S10 robot around a waypoint track using perception. Participants train their own perception-based locomotion policy to control the S10 robot in the provided track scene.
+### 1. Flying Mode ✈️
 
-The default MuJoCo scene is `S10_track.xml`, which includes:
+The flying-mode implementation is mainly contained in:
 
-- the unscaled S10 robot model from `S10.xml`. The corresponding URDF of S10 is `S10.urdf`.
-- the scaled environment from `scene.xml`
-- the visual waypoint track from `track_overlay.xml`
+* [`m7.py`](src/S10_sdk_deploy/interface/robot/simulation/m7.py)
 
-```mermaid
-graph LR
-    A["/rl_deploy"] -->|/JOINTS_CMD| B["/mujoco_simulation"]
-    B -->|/IMU_DATA| A
-    B -->|/JOINTS_DATA| A
-```
+`m7.py` contains the simulation/control implementation used for the flying mode.
 
-## Competition Task
+---
 
-The goal is to complete the waypoint course as quickly as possible. During the track scene, waypoint progress is checked in order. When the robot base enters a `0.2 m` horizontal radius of waypoint 0, the timer starts and that waypoint disappears. Each following waypoint disappears only after the previous one has been reached. When the final waypoint is reached, the timer stops and the elapsed simulation time is printed in the terminal.
+### 2. Navigation Mode 🧭
 
-Participants are expected to train their own policy with perception. This policy should serve as the locomotion policy for controlling the S10 robot. Participants will need to implement a simulated lidar or depth camera in MuJoCo and use that sensor input as part of their policy pipeline.
+The navigation-mode implementation uses the following files:
 
-For simulation, participants are not required to build a SLAM algorithm. You may directly use the ground truth robot position from MuJoCo. Navigation is optional; if you implement navigation, the final elapsed time will be divided by `1.2` for scoring.
+* [`s11.xml`](src/S10_sdk_deploy/S10_description/s10_mjcf/mjcf/s11.xml)
+* [`m15.py`](src/S10_sdk_deploy/interface/robot/simulation/m15.py)
 
-## Setup
+#### MuJoCo model
 
-Use Ubuntu 24.04 with ROS 2 Jazzy. Source ROS before building:
+`s11.xml` contains the MuJoCo model/configuration used for the navigation-mode simulation.
+
+#### Navigation simulation
+
+`m15.py` contains the corresponding Python simulation/control code.
+
+---
+
+### 3. LiDAR and Camera 📡📷
+
+The LiDAR and camera simulation/information is associated with:
+
+* [`m11.py`](src/S10_sdk_deploy/interface/robot/simulation/m11.py)
+* [`m12.py`](src/S10_sdk_deploy/interface/robot/simulation/m12.py)
+* [`s12.xml`](src/S10_sdk_deploy/S10_description/s10_mjcf/mjcf/s12.xml)
+
+#### `m11.py`
+
+Contains LiDAR/camera-related simulation functionality.
+
+#### `m12.py`
+
+Contains additional sensor/simulation functionality.
+
+#### `s12.xml`
+
+Contains the corresponding MuJoCo model configuration for the sensor setup.
+
+---
+
+## Quick Overview
+
+| Function             | Main files                    |
+| -------------------- | ----------------------------- |
+| ✈️ Flying mode       | `m7.py`                       |
+| 🧭 Navigation mode   | `m15.py`, `s11.xml`           |
+| 📡 LiDAR / 📷 Camera | `m11.py`, `m12.py`, `s12.xml` |
+
+## Requirements
+
+The project uses Python and MuJoCo. Depending on the simulation code being used, additional dependencies may be required.
+
+A typical environment can be created with:
 
 ```bash
-pip install "numpy < 2.0" mujoco
-git clone https://github.com/DeepRoboticsLab/goai_embodied_future_material.git
-
-cd goai_embodied_future_material
-source /opt/ros/jazzy/setup.bash
-colcon build --packages-up-to s10_sdk_deploy --cmake-args -DBUILD_PLATFORM=x86
+python3 -m venv mujoco_env
+source mujoco_env/bin/activate
 ```
 
-Use `-DBUILD_PLATFORM=arm` when building for the S10 robot target.
+Install the required Python packages according to the project's dependency configuration.
 
-## Run Simulation
+## Running the Simulation
 
-Open two terminals.
+The exact command depends on which mode is being tested.
 
-Terminal 1:
+For example:
 
 ```bash
-export ROS_DOMAIN_ID=1
-source install/setup.bash
-ros2 run s10_sdk_deploy rl_deploy
+python3 src/S10_sdk_deploy/interface/robot/simulation/m7.py
 ```
 
-Terminal 2:
+for the flying-mode simulation, or:
 
 ```bash
-export ROS_DOMAIN_ID=1
-source install/setup.bash
-python3 src/S10_sdk_deploy/interface/robot/simulation/mujoco_simulation_ros2.py
+python3 src/S10_sdk_deploy/interface/robot/simulation/m15.py
 ```
 
-To load a custom MJCF, for example after adding a lidar or depth camera:
+for the navigation-mode simulation.
 
-```bash
-S10_MUJOCO_XML=/absolute/path/to/model.xml \
-python3 src/S10_sdk_deploy/interface/robot/simulation/mujoco_simulation_ros2.py
+Make sure the required MuJoCo model files are available before running the corresponding Python scripts.
+
+## MuJoCo Models
+
+The main MuJoCo models described in this repository include:
+
+```text
+src/S10_sdk_deploy/S10_description/s10_mjcf/mjcf/
+├── s11.xml    # Navigation mode
+└── s12.xml    # LiDAR / camera configuration
 ```
 
-## Simulator Parameters
+## Notes
 
-The following parameters are defined near the top of
-`src/S10_sdk_deploy/interface/robot/simulation/mujoco_simulation_ros2.py`.
-Restart the simulator after changing them.
+The repository is under active development. File names and simulation configurations may change as the S10 robot simulation is developed further.
 
-| Parameter | Default | Description |
-| --- | --- | --- |
-| `USE_VIEWER` | `True` | Enables or disables the MuJoCo viewer. |
-| `TRACK_VIEWER` | `False` | Makes the viewer camera follow `TRACK_BODY_NAME` when the simulator starts. |
-| `CAMERA_AZIMUTH` | `90` | Initial horizontal camera angle in degrees. |
-| `CAMERA_ELEVATION` | `-25` | Initial vertical camera angle in degrees. |
-| `CAMERA_DISTANCE` | `18.0` | Initial camera distance from the robot. |
-| `TRACK_START_BASE_POS` | `[0.0, -2.5, 0.2]` | Initial robot base position in `[x, y, z]` order. |
-| `TRACK_BODY_NAME` | `"base_link"` | MuJoCo body used for waypoint progress and startup camera tracking. |
+## Author
 
-## Hardware Spec (Lidar)
-Please refer to the files inside this doc: /home/pb/goai_embodied_future_material/doc.
+**DelinaLalbosco**
 
-## Manual Controls
-
-In the simulator window:
-
-- `z`: default position
-- `c`: RL control default position
-- `w/a/s/d`: forward, leftward, backward, rightward
-- `q/e`: rotate counterclockwise or clockwise
-- `Ctrl` + right-double-click a body: start camera tracking for that body
-- `Esc`: stop camera tracking and return to the free camera
-
-Right-click the simulator window and select "always on top" if it loses focus during testing.
+GitHub: [DelinaLalbosco](https://github.com/DelinaLalbosco)
