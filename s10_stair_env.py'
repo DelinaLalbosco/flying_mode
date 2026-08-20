@@ -1,0 +1,1582 @@
+#!/usr/bin/env python3
+
+"""
+Deep Robotics S10 - Stair Climbing PPO Environment
+
+Purpose
+-------
+Train an S10 quadruped robot to:
+
+    1. Stand stably
+    2. Walk forward
+    3. Approach a staircase
+    4. Climb the staircase
+    5. Continue forward after the staircase
+    6. Reach the target position
+
+IMPORTANT
+---------
+This environment uses an EXISTING stair MJCF file.
+
+It does NOT generate an XML file dynamically.
+
+Expected files:
+
+    src/S10_sdk_deploy/
+        S10_description/
+            s10_mjcf/
+                mjcf/
+                    S10.xml
+                    S10_stairs_training.xml
+
+Observation:
+    57 values
+
+        3   base angular velocity
+        3   projected gravity
+        3   command
+        16  joint position error
+        16  joint velocity
+        16  previous action
+
+Action:
+    16 normalized values in [-1, 1]
+
+        12 leg joints -> position targets
+        4 wheel joints -> velocity targets
+"""
+
+import os
+import numpy as np
+import mujoco
+import gymnasium as gym
+
+from gymnasium import spaces
+
+
+class S10StairEnv(gym.Env):
+
+    metadata = {
+        "render_modes": ["human"]
+    }
+
+    # ============================================================
+    # JOINT NAMES
+    # ============================================================
+
+    JOINT_NAMES = [
+
+        "fl_hipx_joint",
+        "fl_hipy_joint",
+        "fl_knee_joint",
+        "fl_wheel_joint",
+
+        "fr_hipx_joint",
+        "fr_hipy_joint",
+        "fr_knee_joint",
+        "fr_wheel_joint",
+
+        "hl_hipx_joint",
+        "hl_hipy_joint",
+        "hl_knee_joint",
+        "hl_wheel_joint",
+
+        "hr_hipx_joint",
+        "hr_hipy_joint",
+        "hr_knee_joint",
+        "hr_wheel_joint",
+    ]
+
+    # ============================================================
+    # NOMINAL S10 STANDING POSE
+    # ============================================================
+
+    DEFAULT_POS = np.array([
+         0.0, -0.3,  0.6, 0.0,
+         0.0, -0.3,  0.6, 0.0,
+         0.0,  0.3, -0.6, 0.0,
+         0.0,  0.3, -0.6, 0.0,
+    ], dtype=np.float32)
+
+    # ============================================================
+    # ACTION SCALE
+    # ============================================================
+
+    ACTION_SCALE = np.array([
+        0.125, 0.25, 0.25, 5.0,
+
+        0.125, 0.25, 0.25, 5.0,
+
+        0.125, 0.25, 0.25, 5.0,
+
+        0.125, 0.25, 0.25, 5.0,
+    ], dtype=np.float32)
+
+    # ============================================================
+    # OBSERVATION SCALING
+    # ============================================================
+
+    OMEGA_SCALE = 0.25
+    DOF_VEL_SCALE = 0.05
+
+    # ============================================================
+    # PD GAINS
+    # ============================================================
+
+    KP = np.array(
+        [
+            80.0, 80.0, 80.0, 0.0,
+
+            80.0, 80.0, 80.0, 0.0,
+
+            80.0, 80.0, 80.0, 0.0,
+
+            80.0, 80.0, 80.0, 0.0,
+        ],
+        dtype=np.float32
+    )
+
+    KD = np.array(
+        [
+            2.0, 2.0, 2.0, 0.6,
+
+            2.0, 2.0, 2.0, 0.6,
+
+            2.0, 2.0, 2.0, 0.6,
+
+            2.0, 2.0, 2.0, 0.6,
+        ],
+        dtype=np.float32
+    )
+
+    # ============================================================
+    # INITIALIZATION
+    # ============================================================
+
+    def __init__(
+        self,
+        xml_path=None,
+        render_mode=None,
+
+        episode_length=1000,
+
+        step_height=0.08,
+        step_depth=0.35,
+        num_steps=2,
+
+        stair_start_x=1.20,
+        goal_x=2.50,
+    ):
+
+        super().__init__()
+
+        print("=" * 70)
+        print("S10 STAIR CLIMBING ENVIRONMENT")
+        print("=" * 70)
+
+        # --------------------------------------------------------
+        # Episode configuration
+        # --------------------------------------------------------
+
+        self.episode_length = int(
+            episode_length
+        )
+
+        # --------------------------------------------------------
+        # Stair configuration
+        # --------------------------------------------------------
+
+        self.step_height = float(
+            step_height
+        )
+
+        self.step_depth = float(
+            step_depth
+        )
+
+        self.num_steps = int(
+            num_steps
+        )
+
+        self.stair_start_x = float(
+            stair_start_x
+        )
+
+        self.goal_x = float(
+            goal_x
+        )
+
+        # End of staircase
+        self.stair_end_x = (
+            self.stair_start_x
+            + self.num_steps * self.step_depth
+        )
+
+        # --------------------------------------------------------
+        # XML path
+        # --------------------------------------------------------
+
+        repo_root = os.path.dirname(
+            os.path.abspath(__file__)
+        )
+
+        if xml_path is None:
+
+            xml_path = os.path.join(
+                repo_root,
+                "src",
+                "S10_sdk_deploy",
+                "S10_description",
+                "s10_mjcf",
+                "mjcf",
+                "S10_stairs_training.xml",
+            )
+
+        self.xml_path = os.path.abspath(
+            xml_path
+        )
+
+        print()
+        print("Stair XML:")
+        print(self.xml_path)
+
+        if not os.path.isfile(
+            self.xml_path
+        ):
+
+            raise FileNotFoundError(
+                "\nS10 stair XML not found:\n"
+                f"{self.xml_path}\n\n"
+                "Check that the file exists with:\n"
+                "find ~/robot_ws -name "
+                "\"S10_stairs_training.xml\" -type f"
+            )
+
+        # --------------------------------------------------------
+        # Load MuJoCo
+        # --------------------------------------------------------
+
+        self.model = (
+            mujoco.MjModel.from_xml_path(
+                self.xml_path
+            )
+        )
+
+        self.data = mujoco.MjData(
+            self.model
+        )
+
+        # --------------------------------------------------------
+        # Timing
+        # --------------------------------------------------------
+
+        self.policy_dt = 0.02
+
+        self.physics_dt = float(
+            self.model.opt.timestep
+        )
+
+        self.decimation = max(
+            1,
+            int(
+                round(
+                    self.policy_dt
+                    / self.physics_dt
+                )
+            )
+        )
+
+        print()
+        print(
+            "MuJoCo timestep:",
+            self.physics_dt
+        )
+
+        print(
+            "Policy timestep:",
+            self.policy_dt
+        )
+
+        print(
+            "Decimation:",
+            self.decimation
+        )
+
+        # --------------------------------------------------------
+        # Joint addresses
+        # --------------------------------------------------------
+
+        self.qpos_addr = np.zeros(
+            16,
+            dtype=np.int32
+        )
+
+        self.qvel_addr = np.zeros(
+            16,
+            dtype=np.int32
+        )
+
+        for i, name in enumerate(
+            self.JOINT_NAMES
+        ):
+
+            joint_id = mujoco.mj_name2id(
+                self.model,
+                mujoco.mjtObj.mjOBJ_JOINT,
+                name,
+            )
+
+            if joint_id < 0:
+
+                raise RuntimeError(
+                    f"Joint not found in XML: {name}"
+                )
+
+            self.qpos_addr[i] = (
+                self.model.jnt_qposadr[
+                    joint_id
+                ]
+            )
+
+            self.qvel_addr[i] = (
+                self.model.jnt_dofadr[
+                    joint_id
+                ]
+            )
+
+        # --------------------------------------------------------
+        # Base body
+        # --------------------------------------------------------
+
+        self.base_body_id = (
+            mujoco.mj_name2id(
+                self.model,
+                mujoco.mjtObj.mjOBJ_BODY,
+                "base_link",
+            )
+        )
+
+        if self.base_body_id < 0:
+
+            raise RuntimeError(
+                "base_link not found in XML"
+            )
+
+        # --------------------------------------------------------
+        # Spaces
+        # --------------------------------------------------------
+
+        self.observation_space = spaces.Box(
+            low=-np.inf,
+            high=np.inf,
+            shape=(57,),
+            dtype=np.float32,
+        )
+
+        self.action_space = spaces.Box(
+            low=-1.0,
+            high=1.0,
+            shape=(16,),
+            dtype=np.float32,
+        )
+
+        # --------------------------------------------------------
+        # State
+        # --------------------------------------------------------
+
+        self.previous_action = np.zeros(
+            16,
+            dtype=np.float32
+        )
+
+        # Command:
+        #
+        # vx = desired forward velocity
+        # vy = desired lateral velocity
+        # wz = desired yaw velocity
+        #
+        # Stair climbing uses forward command.
+
+        self.command = np.array(
+            [
+                0.25,
+                0.0,
+                0.0,
+            ],
+            dtype=np.float32
+        )
+
+        self.step_count = 0
+
+        self.previous_x = 0.0
+
+        self.max_x = 0.0
+
+        self.viewer = None
+
+        # --------------------------------------------------------
+        # Print configuration
+        # --------------------------------------------------------
+
+        print()
+        print("Stair configuration:")
+        print(
+            f"  Step height: {self.step_height}"
+        )
+        print(
+            f"  Step depth: {self.step_depth}"
+        )
+        print(
+            f"  Number of steps: {self.num_steps}"
+        )
+        print(
+            f"  Stair start X: {self.stair_start_x}"
+        )
+        print(
+            f"  Stair end X: {self.stair_end_x}"
+        )
+        print(
+            f"  Target X: {self.goal_x}"
+        )
+
+        print("=" * 70)
+
+    # ============================================================
+    # RESET
+    # ============================================================
+
+    def reset(
+        self,
+        *,
+        seed=None,
+        options=None
+    ):
+
+        super().reset(
+            seed=seed
+        )
+
+        # --------------------------------------------------------
+        # Reset MuJoCo
+        # --------------------------------------------------------
+
+        mujoco.mj_resetData(
+            self.model,
+            self.data
+        )
+
+        # --------------------------------------------------------
+        # Floating base
+        # --------------------------------------------------------
+
+        self.data.qpos[0:3] = np.array(
+            [
+                0.0,
+                0.0,
+                0.50,
+            ],
+            dtype=np.float64
+        )
+
+        # Identity quaternion
+        self.data.qpos[3:7] = np.array(
+            [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+            ],
+            dtype=np.float64
+        )
+
+        # --------------------------------------------------------
+        # Standing pose
+        # --------------------------------------------------------
+
+        for i in range(16):
+
+            self.data.qpos[
+                self.qpos_addr[i]
+            ] = self.DEFAULT_POS[i]
+
+        # --------------------------------------------------------
+        # Randomization
+        # --------------------------------------------------------
+
+        deterministic = (
+            options is not None
+            and options.get(
+                "deterministic",
+                False
+            )
+        )
+
+        if not deterministic:
+
+            # Very small position noise
+            self.data.qpos[0] += (
+                self.np_random.uniform(
+                    -0.003,
+                    0.003
+                )
+            )
+
+            self.data.qpos[1] += (
+                self.np_random.uniform(
+                    -0.003,
+                    0.003
+                )
+            )
+
+            # Small joint noise
+            for i in range(12):
+
+                self.data.qpos[
+                    self.qpos_addr[i]
+                ] += self.np_random.uniform(
+                    -0.005,
+                    0.005
+                )
+
+        # --------------------------------------------------------
+        # Zero velocities
+        # --------------------------------------------------------
+
+        self.data.qvel[:] = 0.0
+
+        self.data.act[:] = 0.0
+
+        self.data.ctrl[:] = 0.0
+
+        # --------------------------------------------------------
+        # Forward kinematics
+        # --------------------------------------------------------
+
+        mujoco.mj_forward(
+            self.model,
+            self.data
+        )
+
+        # --------------------------------------------------------
+        # Reset state
+        # --------------------------------------------------------
+
+        self.previous_action[:] = 0.0
+
+        self.step_count = 0
+
+        self.previous_x = float(
+            self.data.qpos[0]
+        )
+
+        self.max_x = float(
+            self.data.qpos[0]
+        )
+
+        # --------------------------------------------------------
+        # Observation
+        # --------------------------------------------------------
+
+        obs = self._get_observation()
+
+        info = self._get_info()
+
+        return obs, info
+
+    # ============================================================
+    # OBSERVATION
+    # ============================================================
+
+    def _get_observation(self):
+
+        # --------------------------------------------------------
+        # Base angular velocity
+        # --------------------------------------------------------
+
+        base_omega = np.array(
+            self.data.qvel[3:6],
+            dtype=np.float64
+        )
+
+        base_omega *= self.OMEGA_SCALE
+
+        # --------------------------------------------------------
+        # Base orientation
+        # --------------------------------------------------------
+
+        quat = self.data.qpos[3:7]
+
+        rotation = np.zeros(
+            (3, 3),
+            dtype=np.float64
+        )
+
+        mujoco.mju_quat2Mat(
+            rotation.reshape(-1),
+            quat
+        )
+
+        # --------------------------------------------------------
+        # Projected gravity
+        # --------------------------------------------------------
+
+        world_gravity = np.array(
+            [
+                0.0,
+                0.0,
+                -1.0,
+            ],
+            dtype=np.float64
+        )
+
+        projected_gravity = (
+            rotation.T
+            @ world_gravity
+        )
+
+        # --------------------------------------------------------
+        # Joint state
+        # --------------------------------------------------------
+
+        joint_pos = np.zeros(
+            16,
+            dtype=np.float64
+        )
+
+        joint_vel = np.zeros(
+            16,
+            dtype=np.float64
+        )
+
+        for i in range(16):
+
+            joint_pos[i] = (
+                self.data.qpos[
+                    self.qpos_addr[i]
+                ]
+            )
+
+            joint_vel[i] = (
+                self.data.qvel[
+                    self.qvel_addr[i]
+                ]
+            )
+
+        # Wheels are represented through velocity.
+        # Their position is not useful to the policy.
+
+        joint_pos[3::4] = 0.0
+
+        # Position error
+        joint_pos -= self.DEFAULT_POS
+
+        # Scale velocity
+        joint_vel *= self.DOF_VEL_SCALE
+
+        # --------------------------------------------------------
+        # Observation
+        # --------------------------------------------------------
+
+        obs = np.concatenate(
+            [
+                base_omega,
+                projected_gravity,
+                self.command,
+                joint_pos,
+                joint_vel,
+                self.previous_action,
+            ]
+        )
+
+        if obs.shape != (57,):
+
+            raise RuntimeError(
+                f"Invalid observation shape: {obs.shape}"
+            )
+
+        return obs.astype(
+            np.float32
+        )
+
+    # ============================================================
+    # ACTION
+    # ============================================================
+
+    def _apply_action(
+        self,
+        action
+    ):
+
+        action = np.asarray(
+            action,
+            dtype=np.float32
+        )
+
+        action = np.clip(
+            action,
+            -1.0,
+            1.0
+        )
+
+        # --------------------------------------------------------
+        # Target positions / velocities
+        # --------------------------------------------------------
+
+        target = (
+            action * self.ACTION_SCALE
+            + self.DEFAULT_POS
+        )
+
+        q = np.zeros(
+            16,
+            dtype=np.float64
+        )
+
+        dq = np.zeros(
+            16,
+            dtype=np.float64
+        )
+
+        for i in range(16):
+
+            q[i] = (
+                self.data.qpos[
+                    self.qpos_addr[i]
+                ]
+            )
+
+            dq[i] = (
+                self.data.qvel[
+                    self.qvel_addr[i]
+                ]
+            )
+
+        torque = np.zeros(
+            16,
+            dtype=np.float64
+        )
+
+        # --------------------------------------------------------
+        # Leg joints
+        # --------------------------------------------------------
+
+        for i in range(12):
+
+            position_error = (
+                target[i] - q[i]
+            )
+
+            velocity_error = -dq[i]
+
+            torque[i] = (
+                self.KP[i]
+                * position_error
+                +
+                self.KD[i]
+                * velocity_error
+            )
+
+        # --------------------------------------------------------
+        # Wheel joints
+        # --------------------------------------------------------
+
+        for leg in range(4):
+
+            i = (
+                4 * leg + 3
+            )
+
+            desired_velocity = (
+                target[i]
+            )
+
+            velocity_error = (
+                desired_velocity
+                - dq[i]
+            )
+
+            torque[i] = (
+                self.KD[i]
+                * velocity_error
+            )
+
+        # --------------------------------------------------------
+        # Torque limits
+        # --------------------------------------------------------
+
+        torque[:12] = np.clip(
+            torque[:12],
+            -50.0,
+            50.0
+        )
+
+        torque[3::4] = np.clip(
+            torque[3::4],
+            -14.0,
+            14.0
+        )
+
+        # --------------------------------------------------------
+        # Apply
+        # --------------------------------------------------------
+
+        self.data.ctrl[:] = torque
+
+    # ============================================================
+    # STEP
+    # ============================================================
+
+    def step(
+        self,
+        action
+    ):
+
+        action = np.asarray(
+            action,
+            dtype=np.float32
+        )
+
+        action = np.clip(
+            action,
+            -1.0,
+            1.0
+        )
+
+        # --------------------------------------------------------
+        # Apply action
+        # --------------------------------------------------------
+
+        self._apply_action(
+            action
+        )
+
+        # --------------------------------------------------------
+        # Physics
+        # --------------------------------------------------------
+
+        for _ in range(
+            self.decimation
+        ):
+
+            mujoco.mj_step(
+                self.model,
+                self.data
+            )
+
+        # --------------------------------------------------------
+        # Previous action
+        # --------------------------------------------------------
+
+        self.previous_action = (
+            action.copy()
+        )
+
+        self.step_count += 1
+
+        # --------------------------------------------------------
+        # Current state
+        # --------------------------------------------------------
+
+        current_x = float(
+            self.data.qpos[0]
+        )
+
+        current_y = float(
+            self.data.qpos[1]
+        )
+
+        current_height = float(
+            self.data.qpos[2]
+        )
+
+        # --------------------------------------------------------
+        # Forward progress
+        # --------------------------------------------------------
+
+        dx = (
+            current_x
+            - self.previous_x
+        )
+
+        self.previous_x = current_x
+
+        self.max_x = max(
+            self.max_x,
+            current_x
+        )
+
+        # --------------------------------------------------------
+        # Observation
+        # --------------------------------------------------------
+
+        obs = self._get_observation()
+
+        # --------------------------------------------------------
+        # Reward
+        # --------------------------------------------------------
+
+        reward = self._compute_reward(
+            action,
+            dx
+        )
+
+        # --------------------------------------------------------
+        # Termination
+        # --------------------------------------------------------
+
+        terminated = self._is_fallen()
+
+        # Goal
+        goal_reached = (
+            current_x >= self.goal_x
+            and current_height > 0.30
+            and not terminated
+        )
+
+        if goal_reached:
+
+            reward += 100.0
+
+            terminated = True
+
+        # --------------------------------------------------------
+        # Time limit
+        # --------------------------------------------------------
+
+        truncated = (
+            self.step_count
+            >= self.episode_length
+        )
+
+        # --------------------------------------------------------
+        # Info
+        # --------------------------------------------------------
+
+        info = self._get_info()
+
+        info["forward_progress"] = float(
+            current_x
+        )
+
+        info["dx"] = float(
+            dx
+        )
+
+        info["goal_reached"] = bool(
+            goal_reached
+        )
+
+        info["max_x"] = float(
+            self.max_x
+        )
+
+        # --------------------------------------------------------
+        # Episode information
+        # --------------------------------------------------------
+
+        if terminated or truncated:
+
+            info["terminal_reason"] = (
+                "goal_reached"
+                if goal_reached
+                else
+                "fallen"
+                if terminated
+                else
+                "timeout"
+            )
+
+        return (
+            obs,
+            float(reward),
+            terminated,
+            truncated,
+            info,
+        )
+
+    # ============================================================
+    # REWARD
+    # ============================================================
+
+    def _compute_reward(
+        self,
+        action,
+        dx
+    ):
+
+        # ========================================================
+        # Orientation
+        # ========================================================
+
+        quat = self.data.qpos[3:7]
+
+        rotation = np.zeros(
+            (3, 3),
+            dtype=np.float64
+        )
+
+        mujoco.mju_quat2Mat(
+            rotation.reshape(-1),
+            quat
+        )
+
+        upright = float(
+            rotation[2, 2]
+        )
+
+        # ========================================================
+        # Height
+        # ========================================================
+
+        height = float(
+            self.data.qpos[2]
+        )
+
+        # Normal standing height
+        target_height = 0.50
+
+        height_error = (
+            height
+            - target_height
+        )
+
+        height_reward = np.exp(
+            -25.0
+            * height_error
+            * height_error
+        )
+
+        # ========================================================
+        # Joint pose
+        # ========================================================
+
+        joint_error = 0.0
+
+        for i in range(12):
+
+            error = (
+                self.data.qpos[
+                    self.qpos_addr[i]
+                ]
+                - self.DEFAULT_POS[i]
+            )
+
+            joint_error += (
+                error * error
+            )
+
+        joint_pose_reward = np.exp(
+            -4.0
+            * joint_error
+        )
+
+        # ========================================================
+        # Linear velocity
+        # ========================================================
+
+        vx = float(
+            self.data.qvel[0]
+        )
+
+        vy = float(
+            self.data.qvel[1]
+        )
+
+        # ========================================================
+        # Angular velocity
+        # ========================================================
+
+        angular_velocity = (
+            self.data.qvel[3:6]
+        )
+
+        angular_velocity_penalty = (
+            np.sum(
+                angular_velocity ** 2
+            )
+        )
+
+        # ========================================================
+        # Sideways movement penalty
+        # ========================================================
+
+        lateral_penalty = (
+            vy * vy
+        )
+
+        # ========================================================
+        # Action penalty
+        # ========================================================
+
+        action_penalty = np.sum(
+            action ** 2
+        )
+
+        # ========================================================
+        # Forward progress
+        # ========================================================
+
+        # Reward actual movement in +X direction.
+        #
+        # This is important.
+        #
+        # Without this term the robot can remain approximately
+        # stationary and still obtain a reasonable standing reward.
+
+        progress_reward = (
+            25.0 * dx
+        )
+
+        # Encourage useful forward velocity
+        forward_velocity_reward = (
+            1.5
+            * np.clip(
+                vx,
+                0.0,
+                0.50
+            )
+        )
+
+        # Penalize moving backwards
+        backwards_penalty = (
+            2.0
+            * max(
+                0.0,
+                -vx
+            )
+        )
+
+        # ========================================================
+        # Distance to goal
+        # ========================================================
+
+        x = float(
+            self.data.qpos[0]
+        )
+
+        distance_to_goal = max(
+            0.0,
+            self.goal_x - x
+        )
+
+        # Small shaping reward for getting closer.
+        #
+        # It is deliberately small compared with progress,
+        # otherwise the robot may learn strange shortcuts.
+
+        distance_reward = (
+            0.10
+            * (
+                1.0
+                / (
+                    1.0
+                    + distance_to_goal
+                )
+            )
+        )
+
+        # ========================================================
+        # Stair-region stability
+        # ========================================================
+
+        on_stairs = (
+            x >= self.stair_start_x
+            and x <= self.stair_end_x + 0.25
+        )
+
+        stair_stability_reward = 0.0
+
+        if on_stairs:
+
+            # More important to stay upright while climbing.
+
+            stair_stability_reward = (
+                2.0
+                * max(
+                    0.0,
+                    upright
+                )
+            )
+
+        # ========================================================
+        # Final reward
+        # ========================================================
+
+        reward = (
+
+            # Upright
+            2.5
+            * max(
+                0.0,
+                upright
+            )
+
+            # Stable height
+            + 1.5
+            * height_reward
+
+            # Reasonable leg configuration
+            + 0.5
+            * joint_pose_reward
+
+            # Forward progress
+            + progress_reward
+
+            # Forward velocity
+            + forward_velocity_reward
+
+            # Distance shaping
+            + distance_reward
+
+            # Stair stability
+            + stair_stability_reward
+
+            # Penalties
+            - 0.08
+            * angular_velocity_penalty
+
+            - 0.20
+            * lateral_penalty
+
+            - 0.10
+            * backwards_penalty
+
+            - 0.001
+            * action_penalty
+        )
+
+        # ========================================================
+        # Falling penalty
+        # ========================================================
+
+        if self._is_fallen():
+
+            reward -= 30.0
+
+        return float(
+            reward
+        )
+
+    # ============================================================
+    # FALL DETECTION
+    # ============================================================
+
+    def _is_fallen(self):
+
+        height = float(
+            self.data.qpos[2]
+        )
+
+        # Too low
+        if height < 0.25:
+
+            return True
+
+        # Unrealistic launch
+        if height > 1.20:
+
+            return True
+
+        # --------------------------------------------------------
+        # Orientation
+        # --------------------------------------------------------
+
+        quat = self.data.qpos[3:7]
+
+        rotation = np.zeros(
+            (3, 3),
+            dtype=np.float64
+        )
+
+        mujoco.mju_quat2Mat(
+            rotation.reshape(-1),
+            quat
+        )
+
+        z_axis = rotation[:, 2]
+
+        # Too much tilt
+        if z_axis[2] < 0.50:
+
+            return True
+
+        # --------------------------------------------------------
+        # Excessive angular velocity
+        # --------------------------------------------------------
+
+        angular_velocity = (
+            self.data.qvel[3:6]
+        )
+
+        if np.linalg.norm(
+            angular_velocity
+        ) > 25.0:
+
+            return True
+
+        return False
+
+    # ============================================================
+    # STAIR LEVEL
+    # ============================================================
+
+    def _get_stair_level(
+        self,
+        x
+    ):
+
+        if x < self.stair_start_x:
+
+            return 0
+
+        distance = (
+            x
+            - self.stair_start_x
+        )
+
+        level = int(
+            np.floor(
+                distance
+                / self.step_depth
+            )
+        ) + 1
+
+        level = min(
+            level,
+            self.num_steps
+        )
+
+        return level
+
+    # ============================================================
+    # INFORMATION
+    # ============================================================
+
+    def _get_info(self):
+
+        velocity = (
+            self.data.qvel
+        )
+
+        x = float(
+            self.data.qpos[0]
+        )
+
+        y = float(
+            self.data.qpos[1]
+        )
+
+        height = float(
+            self.data.qpos[2]
+        )
+
+        stair_level = (
+            self._get_stair_level(
+                x
+            )
+        )
+
+        return {
+
+            "height":
+                height,
+
+            "x":
+                x,
+
+            "y":
+                y,
+
+            "x_velocity":
+                float(velocity[0]),
+
+            "y_velocity":
+                float(velocity[1]),
+
+            "roll_rate":
+                float(velocity[3]),
+
+            "pitch_rate":
+                float(velocity[4]),
+
+            "yaw_rate":
+                float(velocity[5]),
+
+            "goal_x":
+                float(self.goal_x),
+
+            "stair_level":
+                int(stair_level),
+
+            "num_steps":
+                int(self.num_steps),
+
+            "stair_start_x":
+                float(self.stair_start_x),
+
+            "stair_end_x":
+                float(self.stair_end_x),
+
+            "goal_reached":
+                bool(
+                    x >= self.goal_x
+                ),
+        }
+
+    # ============================================================
+    # RENDER
+    # ============================================================
+
+    def render(self):
+
+        if self.render_mode != "human":
+
+            return
+
+        if self.viewer is None:
+
+            try:
+
+                import mujoco.viewer
+
+                self.viewer = (
+                    mujoco.viewer.launch_passive(
+                        self.model,
+                        self.data
+                    )
+                )
+
+            except Exception as e:
+
+                print(
+                    "Viewer error:",
+                    e
+                )
+
+                return
+
+        if self.viewer.is_running():
+
+            self.viewer.sync()
+
+    # ============================================================
+    # CLOSE
+    # ============================================================
+
+    def close(self):
+
+        if self.viewer is not None:
+
+            try:
+
+                if self.viewer.is_running():
+
+                    self.viewer.close()
+
+            except Exception:
+                pass
+
+            self.viewer = None
+
+        # IMPORTANT:
+        # This must be None, NOT NoneO.
+
+        self.data = None
+        self.model = None
+
+
+# =================================================================
+# DIRECT ENVIRONMENT TEST
+# =================================================================
+
+if __name__ == "__main__":
+
+    print()
+    print("=" * 70)
+    print("DIRECT S10 STAIR ENVIRONMENT TEST")
+    print("=" * 70)
+
+    env = S10StairEnv(
+        episode_length=1000,
+
+        step_height=0.08,
+        step_depth=0.35,
+        num_steps=2,
+
+        stair_start_x=1.20,
+        goal_x=2.50,
+
+        render_mode=None,
+    )
+
+    print()
+    print("Observation space:")
+    print(env.observation_space)
+
+    print()
+    print("Action space:")
+    print(env.action_space)
+
+    # -------------------------------------------------------------
+    # Reset
+    # -------------------------------------------------------------
+
+    obs, info = env.reset(
+        options={
+            "deterministic": True
+        }
+    )
+
+    print()
+    print("Initial observation shape:")
+    print(obs.shape)
+
+    print()
+    print("Initial info:")
+    print(info)
+
+    # -------------------------------------------------------------
+    # Random action test
+    # -------------------------------------------------------------
+
+    for i in range(10):
+
+        action = (
+            env.action_space.sample()
+        )
+
+        obs, reward, terminated, truncated, info = (
+            env.step(action)
+        )
+
+        print(
+            f"Step {i + 1:02d}: "
+            f"reward={reward:.3f}, "
+            f"x={info['x']:.3f}, "
+            f"height={info['height']:.3f}, "
+            f"stair_level={info['stair_level']}, "
+            f"terminated={terminated}, "
+            f"truncated={truncated}"
+        )
+
+        if terminated or truncated:
+
+            print(
+                "Episode ended:"
+            )
+
+            print(info)
+
+            break
+
+    # -------------------------------------------------------------
+    # Close
+    # -------------------------------------------------------------
+
+    env.close()
+
+    print()
+    print("=" * 70)
+    print("ENVIRONMENT TEST PASSED")
+    print("=" * 70)
+

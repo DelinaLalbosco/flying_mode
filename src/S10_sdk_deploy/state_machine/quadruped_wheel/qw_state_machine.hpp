@@ -9,6 +9,7 @@
  * 
  */
 #pragma once
+#include "keyboard_interface.hpp"
 
 #include "state_base.h"
 #include "state_machine_base.h"
@@ -17,7 +18,7 @@
 #include "quadruped_wheel/joint_damping_state.hpp"
 #include "quadruped_wheel/rl_control_state.hpp"
 #include "quadruped_wheel/liedown_state.hpp"
-#include "keyboard_interface.hpp"
+
 #include "hardware/s10_interface.hpp"
 #include "udp_server.hpp"
 
@@ -45,7 +46,7 @@ public:
 
     void Start(){
         if(remote_cmd_type_ == RemoteCommandType::kKeyBoard){
-            uc_ptr_ = std::make_shared<KeyboardInterface>(robot_name_);
+           uc_ptr_ = std::make_shared<KeyboardInterface>(robot_name_);
         }else if(remote_cmd_type_ == RemoteCommandType::kGamepad){
             auto gp_ptr = std::make_shared<GamepadInterface>(robot_name_);
             udp_server_ = std::make_shared<UdpServer>(gp_ptr.get());

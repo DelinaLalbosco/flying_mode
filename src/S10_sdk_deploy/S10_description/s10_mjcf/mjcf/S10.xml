@@ -53,6 +53,9 @@
           friction="1 0.01 0.01" group="0"/>
 
     <body name="base_link" pos="0 0.0 0.5" quat="1 0 0 0" childclass="robot">
+      <camera name="front_camera"
+              pos="0.50 0 0.35"
+              euler="0 -20 0"/>
       <freejoint name="floating_base"/>
       <inertial pos="-0.000512 0.057317 0.001182"
                 quat="1 0 0 0"

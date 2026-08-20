@@ -15,7 +15,7 @@ int main(){
     std::cout << "State Machine Start Running" << std::endl;
     rclcpp::init(0, 0);
     //KeyBoard control
-    std::shared_ptr<StateMachineBase> fsm = std::make_shared<qw::QwStateMachine>(RobotName::S10, RemoteCommandType::kKeyBoard);
+    std::shared_ptr<StateMachineBase> fsm = std::make_shared<qw::QwStateMachine>(RobotName::S10, RemoteCommandType::kAutoNav);
     //Gamepad control
     // std::shared_ptr<StateMachineBase> fsm = std::make_shared<qw::QwStateMachine>(RobotName::S10, RemoteCommandType::kGamepad);
     

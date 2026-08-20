@@ -1,0 +1,23 @@
+ wsl -d Ubuntu-24.04
+ 
+  cd ~/robot_ws/goai_embodied_future_material
+  
+  first terminal
+  ¨cd ~/robot_ws/goai_embodied_future_material
+
+export ROS_DOMAIN_ID=1
+source install/setup.bash
+
+ros2 run s10_sdk_deploy rl_deploy
+
+
+second terminal 
+
+cd ~/robot_ws/goai_embodied_future_material
+
+export ROS_DOMAIN_ID=1
+source install/setup.bash
+
+python3 src/S10_sdk_deploy/interface/robot/simulation/mujoco_simulation_ros2.py
+
+source ~/robot_ws/mujoco_env/bin/activate

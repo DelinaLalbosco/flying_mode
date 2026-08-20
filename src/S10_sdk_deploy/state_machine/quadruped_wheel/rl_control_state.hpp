@@ -57,6 +57,7 @@ namespace qw {
             rbs_write_index_.store(1 - write_idx,  std::memory_order_release);
         }
 
+        //gets the user command 
         void PolicyRunner() {
             int run_cnt_record = -1;
             while (start_flag_) {

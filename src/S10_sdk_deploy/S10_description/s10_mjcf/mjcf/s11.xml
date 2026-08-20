@@ -1,0 +1,573 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mujoco model="S11">
+
+    <compiler angle="radian"
+              coordinate="local"
+              inertiafromgeom="true"/>
+
+    <option timestep="0.001"
+            gravity="0 0 -9.81"
+            integrator="implicitfast"/>
+
+    <size njmax="2000"
+          nconmax="1000"/>
+
+    <!-- ========================================================= -->
+    <!-- MATERIALS                                                  -->
+    <!-- ========================================================= -->
+
+    <asset>
+
+        <material name="body_black"
+                  rgba="0.04 0.05 0.06 1"/>
+
+        <material name="body_dark"
+                  rgba="0.10 0.11 0.12 1"/>
+
+        <material name="metal"
+                  rgba="0.35 0.38 0.42 1"/>
+
+        <material name="rubber"
+                  rgba="0.015 0.015 0.015 1"/>
+
+        <material name="camera_glass"
+                  rgba="0.05 0.20 0.30 1"/>
+
+        <material name="lidar"
+                  rgba="0.80 0.20 0.05 1"/>
+
+        <texture name="floor_texture"
+                 type="2d"
+                 builtin="checker"
+                 width="512"
+                 height="512"
+                 rgb1="0.18 0.18 0.18"
+                 rgb2="0.10 0.10 0.10"/>
+
+        <material name="floor_material"
+                  texture="floor_texture"
+                  texrepeat="10 10"
+                  reflectance="0.1"/>
+
+    </asset>
+
+    <!-- ========================================================= -->
+    <!-- DEFAULTS                                                    -->
+    <!-- ========================================================= -->
+
+    <default>
+
+        <joint damping="0.5"
+               armature="0.01"
+               limited="true"/>
+
+        <motor ctrllimited="true"
+               ctrlrange="-40 40"/>
+
+        <geom friction="0.8 0.02 0.01"
+              condim="3"
+              solref="0.02 1"
+              solimp="0.8 0.95 0.001"/>
+
+    </default>
+
+    <!-- ========================================================= -->
+    <!-- WORLD                                                       -->
+    <!-- ========================================================= -->
+
+    <worldbody>
+
+        <!-- Ground -->
+        <geom name="ground"
+              type="plane"
+              pos="0 0 0"
+              size="100 100 0.1"
+              material="floor_material"/>
+
+        <!-- ===================================================== -->
+        <!-- S11 ROBOT                                               -->
+        <!-- ===================================================== -->
+
+        <body name="base_link"
+              pos="0 -2.5 0.45">
+
+            <freejoint/>
+
+            <!-- Main chassis -->
+            <geom name="s11_body"
+                  type="box"
+                  size="0.48 0.30 0.16"
+                  pos="0 0 0"
+                  mass="18"
+                  material="body_black"/>
+
+            <!-- Upper electronics enclosure -->
+            <geom name="s11_top"
+                  type="box"
+                  size="0.32 0.23 0.08"
+                  pos="0 0 0.21"
+                  mass="3"
+                  material="body_dark"/>
+
+            <!-- Front bumper -->
+            <geom name="front_bumper"
+                  type="box"
+                  size="0.05 0.27 0.10"
+                  pos="0.53 0 0"
+                  mass="0.5"
+                  material="metal"/>
+
+            <!-- Rear bumper -->
+            <geom name="rear_bumper"
+                  type="box"
+                  size="0.05 0.27 0.10"
+                  pos="-0.53 0 0"
+                  mass="0.5"
+                  material="metal"/>
+
+            <!-- ================================================= -->
+            <!-- CAMERA                                             -->
+            <!-- ================================================= -->
+
+            <body name="camera_mount"
+                  pos="0.36 0 0.28">
+
+                <geom name="camera_housing"
+                      type="box"
+                      size="0.07 0.06 0.05"
+                      mass="0.15"
+                      material="body_dark"/>
+
+                <camera name="s11_camera"
+                        pos="0.075 0 0"
+                        xyaxes="0 1 0 0 0 1"
+                        fovy="70"/>
+
+            </body>
+
+            <!-- ================================================= -->
+            <!-- LIDAR                                               -->
+            <!-- ================================================= -->
+
+            <body name="lidar_mount"
+                  pos="0 0 0.34">
+
+                <geom name="lidar_body"
+                      type="cylinder"
+                      size="0.07 0.025"
+                      mass="0.2"
+                      material="lidar"/>
+
+            </body>
+
+            <!-- ================================================= -->
+            <!-- FRONT LEFT LEG                                      -->
+            <!-- ================================================= -->
+
+            <body name="fl_hip"
+                  pos="0.32 0.23 0">
+
+                <joint name="fl_hipx_joint"
+                       type="hinge"
+                       axis="1 0 0"
+                       range="-1.2 1.2"/>
+
+                <geom name="fl_hip_geom"
+                      type="capsule"
+                      fromto="0 0 0 0 0 -0.12"
+                      size="0.055"
+                      mass="0.7"
+                      material="metal"/>
+
+                <body name="fl_thigh"
+                      pos="0 0 -0.12">
+
+                    <joint name="fl_hipy_joint"
+                           type="hinge"
+                           axis="0 1 0"
+                           range="-2.2 1.0"/>
+
+                    <geom name="fl_thigh_geom"
+                          type="capsule"
+                          fromto="0 0 0 0 0 -0.27"
+                          size="0.065"
+                          mass="1.2"
+                          material="body_dark"/>
+
+                    <body name="fl_knee"
+                          pos="0 0 -0.27">
+
+                        <joint name="fl_knee_joint"
+                               type="hinge"
+                               axis="0 1 0"
+                               range="-2.7 0.2"/>
+
+                        <geom name="fl_shin"
+                              type="capsule"
+                              fromto="0 0 0 0 0 -0.25"
+                              size="0.055"
+                              mass="0.9"
+                              material="metal"/>
+
+                        <body name="fl_wheel"
+                              pos="0 0 -0.25">
+
+                            <joint name="fl_wheel_joint"
+                                   type="hinge"
+                                   axis="0 1 0"
+                                   limited="false"/>
+
+                            <geom name="fl_wheel_geom"
+                                  type="cylinder"
+                                  size="0.105 0.055"
+                                  quat="0.707107 0 0.707107 0"
+                                  mass="0.7"
+                                  friction="1.2 0.03 0.01"
+                                  material="rubber"/>
+
+                        </body>
+                    </body>
+                </body>
+            </body>
+
+            <!-- ================================================= -->
+            <!-- FRONT RIGHT LEG                                     -->
+            <!-- ================================================= -->
+
+            <body name="fr_hip"
+                  pos="0.32 -0.23 0">
+
+                <joint name="fr_hipx_joint"
+                       type="hinge"
+                       axis="1 0 0"
+                       range="-1.2 1.2"/>
+
+                <geom type="capsule"
+                      fromto="0 0 0 0 0 -0.12"
+                      size="0.055"
+                      mass="0.7"
+                      material="metal"/>
+
+                <body name="fr_thigh"
+                      pos="0 0 -0.12">
+
+                    <joint name="fr_hipy_joint"
+                           type="hinge"
+                           axis="0 1 0"
+                           range="-2.2 1.0"/>
+
+                    <geom type="capsule"
+                          fromto="0 0 0 0 0 -0.27"
+                          size="0.065"
+                          mass="1.2"
+                          material="body_dark"/>
+
+                    <body name="fr_knee"
+                          pos="0 0 -0.27">
+
+                        <joint name="fr_knee_joint"
+                               type="hinge"
+                               axis="0 1 0"
+                               range="-2.7 0.2"/>
+
+                        <geom type="capsule"
+                              fromto="0 0 0 0 0 -0.25"
+                              size="0.055"
+                              mass="0.9"
+                              material="metal"/>
+
+                        <body name="fr_wheel"
+                              pos="0 0 -0.25">
+
+                            <joint name="fr_wheel_joint"
+                                   type="hinge"
+                                   axis="0 1 0"
+                                   limited="false"/>
+
+                            <geom type="cylinder"
+                                  size="0.105 0.055"
+                                  quat="0.707107 0 0.707107 0"
+                                  mass="0.7"
+                                  friction="1.2 0.03 0.01"
+                                  material="rubber"/>
+
+                        </body>
+                    </body>
+                </body>
+            </body>
+
+            <!-- ================================================= -->
+            <!-- HIND LEFT LEG                                       -->
+            <!-- ================================================= -->
+
+            <body name="hl_hip"
+                  pos="-0.32 0.23 0">
+
+                <joint name="hl_hipx_joint"
+                       type="hinge"
+                       axis="1 0 0"
+                       range="-1.2 1.2"/>
+
+                <geom type="capsule"
+                      fromto="0 0 0 0 0 -0.12"
+                      size="0.055"
+                      mass="0.7"
+                      material="metal"/>
+
+                <body name="hl_thigh"
+                      pos="0 0 -0.12">
+
+                    <joint name="hl_hipy_joint"
+                           type="hinge"
+                           axis="0 1 0"
+                           range="-1.0 2.2"/>
+
+                    <geom type="capsule"
+                          fromto="0 0 0 0 0 -0.27"
+                          size="0.065"
+                          mass="1.2"
+                          material="body_dark"/>
+
+                    <body name="hl_knee"
+                          pos="0 0 -0.27">
+
+                        <joint name="hl_knee_joint"
+                               type="hinge"
+                               axis="0 1 0"
+                               range="-0.2 2.7"/>
+
+                        <geom type="capsule"
+                              fromto="0 0 0 0 0 -0.25"
+                              size="0.055"
+                              mass="0.9"
+                              material="metal"/>
+
+                        <body name="hl_wheel"
+                              pos="0 0 -0.25">
+
+                            <joint name="hl_wheel_joint"
+                                   type="hinge"
+                                   axis="0 1 0"
+                                   limited="false"/>
+
+                            <geom type="cylinder"
+                                  size="0.105 0.055"
+                                  quat="0.707107 0 0.707107 0"
+                                  mass="0.7"
+                                  friction="1.2 0.03 0.01"
+                                  material="rubber"/>
+
+                        </body>
+                    </body>
+                </body>
+            </body>
+
+            <!-- ================================================= -->
+            <!-- HIND RIGHT LEG                                      -->
+            <!-- ================================================= -->
+
+            <body name="hr_hip"
+                  pos="-0.32 -0.23 0">
+
+                <joint name="hr_hipx_joint"
+                       type="hinge"
+                       axis="1 0 0"
+                       range="-1.2 1.2"/>
+
+                <geom type="capsule"
+                      fromto="0 0 0 0 0 -0.12"
+                      size="0.055"
+                      mass="0.7"
+                      material="metal"/>
+
+                <body name="hr_thigh"
+                      pos="0 0 -0.12">
+
+                    <joint name="hr_hipy_joint"
+                           type="hinge"
+                           axis="0 1 0"
+                           range="-1.0 2.2"/>
+
+                    <geom type="capsule"
+                          fromto="0 0 0 0 0 -0.27"
+                          size="0.065"
+                          mass="1.2"
+                          material="body_dark"/>
+
+                    <body name="hr_knee"
+                          pos="0 0 -0.27">
+
+                        <joint name="hr_knee_joint"
+                               type="hinge"
+                               axis="0 1 0"
+                               range="-0.2 2.7"/>
+
+                        <geom type="capsule"
+                              fromto="0 0 0 0 0 -0.25"
+                              size="0.055"
+                              mass="0.9"
+                              material="metal"/>
+
+                        <body name="hr_wheel"
+                              pos="0 0 -0.25">
+
+                            <joint name="hr_wheel_joint"
+                                   type="hinge"
+                                   axis="0 1 0"
+                                   limited="false"/>
+
+                            <geom type="cylinder"
+                                  size="0.105 0.055"
+                                  quat="0.707107 0 0.707107 0"
+                                  mass="0.7"
+                                  friction="1.2 0.03 0.01"
+                                  material="rubber"/>
+
+                        </body>
+                    </body>
+                </body>
+            </body>
+
+        </body>
+
+    </worldbody>
+
+    <!-- ========================================================= -->
+    <!-- ACTUATORS                                                   -->
+    <!-- ========================================================= -->
+
+    <actuator>
+
+        <motor name="fl_hipx_motor" joint="fl_hipx_joint" gear="1"/>
+        <motor name="fl_hipy_motor" joint="fl_hipy_joint" gear="1"/>
+        <motor name="fl_knee_motor" joint="fl_knee_joint" gear="1"/>
+        <motor name="fl_wheel_motor" joint="fl_wheel_joint" gear="1"/>
+
+        <motor name="fr_hipx_motor" joint="fr_hipx_joint" gear="1"/>
+        <motor name="fr_hipy_motor" joint="fr_hipy_joint" gear="1"/>
+        <motor name="fr_knee_motor" joint="fr_knee_joint" gear="1"/>
+        <motor name="fr_wheel_motor" joint="fr_wheel_joint" gear="1"/>
+
+        <motor name="hl_hipx_motor" joint="hl_hipx_joint" gear="1"/>
+        <motor name="hl_hipy_motor" joint="hl_hipy_joint" gear="1"/>
+        <motor name="hl_knee_motor" joint="hl_knee_joint" gear="1"/>
+        <motor name="hl_wheel_motor" joint="hl_wheel_joint" gear="1"/>
+
+        <motor name="hr_hipx_motor" joint="hr_hipx_joint" gear="1"/>
+        <motor name="hr_hipy_motor" joint="hr_hipy_joint" gear="1"/>
+        <motor name="hr_knee_motor" joint="hr_knee_joint" gear="1"/>
+        <motor name="hr_wheel_motor" joint="hr_wheel_joint" gear="1"/>
+
+    </actuator>
+
+    <!-- ========================================================= -->
+    <!-- SENSORS                                                     -->
+    <!-- ========================================================= -->
+
+    <sensor>
+
+        <!-- IMU -->
+        <framequat name="imu_quat"
+                   objtype="body"
+                   objname="base_link"/>
+
+        <gyro name="imu_gyro"
+              site="imu_site"/>
+
+        <accelerometer name="imu_acc"
+                       site="imu_site"/>
+
+        <!-- Body velocity -->
+        <velocimeter name="base_velocity"
+                     site="imu_site"/>
+
+        <!-- ===================================================== -->
+        <!-- LIDAR RAYS                                              -->
+        <!-- ===================================================== -->
+
+        <rangefinder name="lidar_front"
+                     site="lidar_front_site"/>
+
+        <rangefinder name="lidar_front_left"
+                     site="lidar_front_left_site"/>
+
+        <rangefinder name="lidar_left"
+                     site="lidar_left_site"/>
+
+        <rangefinder name="lidar_back_left"
+                     site="lidar_back_left_site"/>
+
+        <rangefinder name="lidar_back"
+                     site="lidar_back_site"/>
+
+        <rangefinder name="lidar_back_right"
+                     site="lidar_back_right_site"/>
+
+        <rangefinder name="lidar_right"
+                     site="lidar_right_site"/>
+
+        <rangefinder name="lidar_front_right"
+                     site="lidar_front_right_site"/>
+
+    </sensor>
+
+    <!-- ========================================================= -->
+    <!-- SENSOR SITES                                               -->
+    <!-- ========================================================= -->
+
+    <worldbody>
+
+        <site name="imu_site"
+              pos="0 0 0.25"
+              size="0.01"/>
+
+        <site name="lidar_front_site"
+              pos="0.15 0 0.38"
+              size="0.01"
+              type="sphere"/>
+
+        <site name="lidar_front_left_site"
+              pos="0.15 0 0.38"
+              quat="0.9238795 0 0.3826834 0"
+              size="0.01"
+              type="sphere"/>
+
+        <site name="lidar_left_site"
+              pos="0.15 0 0.38"
+              quat="0.7071068 0 0.7071068 0"
+              size="0.01"
+              type="sphere"/>
+
+        <site name="lidar_back_left_site"
+              pos="0.15 0 0.38"
+              quat="0.3826834 0 0.9238795 0"
+              size="0.01"
+              type="sphere"/>
+
+        <site name="lidar_back_site"
+              pos="0.15 0 0.38"
+              quat="0 0 1 0"
+              size="0.01"
+              type="sphere"/>
+
+        <site name="lidar_back_right_site"
+              pos="0.15 0 0.38"
+              quat="0.3826834 0 -0.9238795 0"
+              size="0.01"
+              type="sphere"/>
+
+        <site name="lidar_right_site"
+              pos="0.15 0 0.38"
+              quat="0.7071068 0 -0.7071068 0"
+              size="0.01"
+              type="sphere"/>
+
+        <site name="lidar_front_right_site"
+              pos="0.15 0 0.38"
+              quat="0.9238795 0 -0.3826834 0"
+              size="0.01"
+              type="sphere"/>
+
+    </worldbody>
+
+</mujoco>
